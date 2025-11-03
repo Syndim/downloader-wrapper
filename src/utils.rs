@@ -20,12 +20,18 @@ fn execute_command_template(template: &str, original_url: &str) -> Option<String
     let cmd = template.replace("{url}", original_url);
     debug!("Executing URL command template: {}", cmd);
     let parts: Vec<&str> = cmd.split_whitespace().collect();
-    if parts.is_empty() { return None; }
+    if parts.is_empty() {
+        return None;
+    }
     let (program, args) = parts.split_first().unwrap();
     match Command::new(program).args(args).output() {
         Ok(output) => {
             if !output.status.success() {
-                warn!("Command template '{}' exited with status {:?}", cmd, output.status.code());
+                warn!(
+                    "Command template '{}' exited with status {:?}",
+                    cmd,
+                    output.status.code()
+                );
                 return None;
             }
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -49,8 +55,12 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
                 if regex.is_match(&result) {
                     // If replacement contains `{url}`, treat as a command template.
                     if rule.replacement.contains("{url}") {
-                        if let Some(new_url) = execute_command_template(&rule.replacement, &result) {
-                            debug!("URL replaced via command template: {} -> {}", result, new_url);
+                        if let Some(new_url) = execute_command_template(&rule.replacement, &result)
+                        {
+                            debug!(
+                                "URL replaced via command template: {} -> {}",
+                                result, new_url
+                            );
                             result = new_url;
                         }
                     } else {
