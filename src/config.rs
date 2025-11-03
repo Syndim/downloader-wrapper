@@ -43,6 +43,8 @@ fn default_curl_path() -> String {
 pub struct UrlReplacement {
     pub pattern: String,
     pub replacement: String,
+    #[serde(default)]
+    pub prehook: Option<String>,
 }
 
 impl Config {

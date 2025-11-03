@@ -44,9 +44,12 @@ aria2c_path = "aria2c"
 curl_path = "curl"
 
 # URL replacements - patterns are regular expressions
+# Optional: prehook runs BEFORE replacement if pattern matches.
+# prehook is a command template; {url} is replaced with the original URL.
 [[replacements]]
 pattern = "^https://example.com/"
 replacement = "https://mirror.example.com/"
+prehook = "echo original={url}"
 
 [[replacements]]
 pattern = "^https://slow-cdn.com/files/"
