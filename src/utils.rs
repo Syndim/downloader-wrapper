@@ -16,19 +16,26 @@ pub fn is_url(s: &str) -> bool {
         || s.starts_with("magnet:")
 }
 
-fn execute_prehook(template: &str, original_url: &str) {
+fn execute_command_template(template: &str, original_url: &str) -> Option<String> {
     let cmd = template.replace("{url}", original_url);
-    debug!("Executing prehook: {}", cmd);
+    debug!("Executing URL command template: {}", cmd);
     let parts: Vec<&str> = cmd.split_whitespace().collect();
-    if parts.is_empty() { return; }
+    if parts.is_empty() { return None; }
     let (program, args) = parts.split_first().unwrap();
-    match Command::new(program).args(args).status() {
-        Ok(status) => {
-            if !status.success() {
-                warn!("Prehook command '{}' exited with status {:?}", cmd, status.code());
+    match Command::new(program).args(args).output() {
+        Ok(output) => {
+            if !output.status.success() {
+                warn!("Command template '{}' exited with status {:?}", cmd, output.status.code());
+                return None;
             }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let last_line = stdout.lines().filter(|l| !l.trim().is_empty()).last();
+            last_line.map(|s| s.trim().to_string())
         }
-        Err(e) => warn!("Failed to execute prehook '{}': {}", cmd, e),
+        Err(e) => {
+            warn!("Failed to execute command template '{}': {}", cmd, e);
+            None
+        }
     }
 }
 
@@ -40,10 +47,17 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
         match Regex::new(&rule.pattern) {
             Ok(regex) => {
                 if regex.is_match(&result) {
-                    if let Some(template) = &rule.prehook {
-                        execute_prehook(template, url_str);
+                    // If replacement contains `{url}`, treat as a command template.
+                    if rule.replacement.contains("{url}") {
+                        if let Some(new_url) = execute_command_template(&rule.replacement, &result) {
+                            debug!("URL replaced via command template: {} -> {}", result, new_url);
+                            result = new_url;
+                        }
+                    } else {
+                        let replaced = regex.replace_all(&result, &rule.replacement).to_string();
+                        debug!("URL replaced via regex: {} -> {}", result, replaced);
+                        result = replaced;
                     }
-                    result = regex.replace_all(&result, &rule.replacement).to_string();
                 }
             }
             Err(e) => {

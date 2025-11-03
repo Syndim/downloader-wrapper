@@ -44,20 +44,21 @@ aria2c_path = "aria2c"
 curl_path = "curl"
 
 # URL replacements - patterns are regular expressions
-# Optional: prehook runs BEFORE replacement if pattern matches.
-# prehook is a command template; {url} is replaced with the original URL.
+# If `replacement` contains the token `{url}` it is treated as a command
+# template. The command is executed (with `{url}` substituted by the current
+# URL) and the last non-empty line of stdout becomes the new URL.
+# Otherwise `replacement` is used as a regex replacement string.
 [[replacements]]
 pattern = "^https://example.com/"
-replacement = "https://mirror.example.com/"
-prehook = "echo original={url}"
+replacement = "echo {url} | sed 's/example.com/mirror.example.com/'"
 
 [[replacements]]
 pattern = "^https://slow-cdn.com/files/"
-replacement = "https://fast-cdn.com/mirror/"
+replacement = "https://fast-cdn.com/mirror/"  # simple regex replacement
 
 [[replacements]]
 pattern = "^magnet:.*dn=([^&]+).*"
-replacement = "magnet:?xt=urn:btih:$1"
+replacement = "magnet:?xt=urn:btih:$1"  # regex capture replacement
 ```
 
 The patterns are regular expressions that will be applied to each URL before passing to aria2c.

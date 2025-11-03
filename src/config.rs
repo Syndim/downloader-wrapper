@@ -39,12 +39,15 @@ fn default_curl_path() -> String {
 }
 
 /// A single URL replacement rule
+/// `replacement` serves dual purpose:
+/// - If it contains the token `{url}` it is treated as a command template.
+///   The command is executed (with `{url}` substituted by the original URL) and
+///   the last line of stdout becomes the new URL.
+/// - Otherwise it is treated as a regex replacement string applied to `pattern`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UrlReplacement {
     pub pattern: String,
     pub replacement: String,
-    #[serde(default)]
-    pub prehook: Option<String>,
 }
 
 impl Config {
