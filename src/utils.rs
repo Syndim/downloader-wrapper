@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::{Context, Result};
+use duct::cmd;
 use regex::Regex;
 use tracing::{debug, warn};
 
@@ -17,29 +17,69 @@ pub fn is_url(s: &str) -> bool {
 }
 
 fn execute_command_template(template: &str, original_url: &str) -> Option<String> {
-    let cmd = template.replace("{url}", original_url);
-    debug!("Executing URL command template: {}", cmd);
-    let parts: Vec<&str> = cmd.split_whitespace().collect();
-    if parts.is_empty() {
-        return None;
-    }
-    let (program, args) = parts.split_first().unwrap();
-    match Command::new(program).args(args).output() {
-        Ok(output) => {
-            if !output.status.success() {
-                warn!(
-                    "Command template '{}' exited with status {:?}",
-                    cmd,
-                    output.status.code()
-                );
+    // Substitute {url}
+    let rendered = template.replace("{url}", original_url);
+    debug!("Command template: {}", rendered);
+
+    let mut extra_env: Vec<(String, String)> = Vec::new();
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // We want environment variable expansion via fish, but we only need the environment values,
+        // not to run the command. Approach:
+        // 1. Capture fish environment into KEY=VALUE lines.
+        // 2. Apply those vars to our current process execution of the command (without fish).
+        // NOTE: This uses 'env' in fish to print all exported variables.
+        let fish_env_output = match cmd!("/opt/homebrew/bin/fish", "-c", "env")
+            .stderr_to_stdout()
+            .read()
+        {
+            Ok(out) => out,
+            Err(e) => {
+                warn!("Fish env capture failed: {}", e);
                 return None;
             }
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let last_line = stdout.lines().filter(|l| !l.trim().is_empty()).last();
+        };
+
+        // Parse KEY=VALUE lines
+        for line in fish_env_output.lines() {
+            if let Some((k, v)) = line.split_once('=')
+                && !k.is_empty()
+            {
+                extra_env.push((k.to_string(), v.to_string()));
+            }
+        }
+        debug!("Captured {} env vars from fish", extra_env.len());
+    }
+
+    // Split original (rendered) command into program/args AFTER variable substitution (fish didn't expand inside rendered).
+    // If you need variable substitution inside rendered, we would need 'fish -c "echo $VAR"'. For now we keep user-provided values.
+    let parts = match shlex::split(&rendered) {
+        Some(v) if !v.is_empty() => v,
+        _ => {
+            warn!("Failed to parse command template: '{}'", rendered);
+            return None;
+        }
+    };
+    let (program, args) = parts.split_first().unwrap();
+    debug!(
+        "Executing program='{}' args={:?} with fish env",
+        program, args
+    );
+
+    let mut command = cmd(program, args);
+    for (k, v) in extra_env {
+        debug!("Adding env: {}={}", k, v);
+        command = command.env(k, v);
+    }
+
+    match command.stderr_to_stdout().read() {
+        Ok(output) => {
+            let last_line = output.lines().rev().find(|l| !l.trim().is_empty());
             last_line.map(|s| s.trim().to_string())
         }
         Err(e) => {
-            warn!("Failed to execute command template '{}': {}", cmd, e);
+            warn!("Failed to execute command '{}': {}", rendered, e);
             None
         }
     }
@@ -76,6 +116,7 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
         }
     }
 
+    debug!("Final URL: {}", result);
     result
 }
 

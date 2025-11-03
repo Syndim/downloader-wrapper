@@ -89,7 +89,7 @@ pub fn run(downloader: Downloader) -> Result<()> {
     let status = ps::run_with(&modified_args, config.get_downloader_path(downloader))?;
 
     if !status.success() {
-        error!("aria2c exited with status: {}", status);
+        error!("downloader exited with status: {}", status);
         std::process::exit(status.code().unwrap_or(1));
     }
 

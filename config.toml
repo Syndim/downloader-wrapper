@@ -9,7 +9,6 @@ curl_path = "curl"
 [[replacements]]
 pattern = "^https://example.com/"
 replacement = "https://mirror.example.com/"
-prehook = "echo original={url}"
 
 [[replacements]]
 pattern = "^https://slow-cdn.com/files/"
