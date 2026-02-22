@@ -28,16 +28,17 @@ fn execute_command_template(template: &str, original_url: &str) -> Option<String
     #[cfg(not(target_os = "windows"))]
     {
         let shell = env::var("SHELL").unwrap_or(String::from("bash"));
+        debug!("Using shell: {}", shell);
         // We want environment variable expansion via fish, but we only need the environment values,
         // not to run the command. Approach:
         // 1. Capture fish environment into KEY=VALUE lines.
         // 2. Apply those vars to our current process execution of the command (without fish).
         // NOTE: This uses 'env' in shell to print all exported variables.
-        let fish_env_output = match cmd!(shell, "-c", "env").stderr_to_stdout().read() {
+        let fish_env_output = match cmd!(&shell, "-l", "-c", "env").stderr_to_stdout().read() {
             Ok(out) => out,
             Err(e) => {
-                warn!("Fish env capture failed: {}", e);
-                return None;
+                warn!("Shell env capture failed: {}", e);
+                String::new()
             }
         };
 
