@@ -74,9 +74,25 @@ fn execute_command_template(template: &str, original_url: &str) -> Option<String
         command = command.env(k, v);
     }
 
-    match command.stderr_to_stdout().read() {
+    match command.stdout_capture().stderr_capture().unchecked().run() {
         Ok(output) => {
-            let last_line = output.lines().rev().find(|l| !l.trim().is_empty());
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let code = output
+                    .status
+                    .code()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                warn!(
+                    "Failed to execute command '{}': exited with code {}\nstderr:\n{}",
+                    rendered,
+                    code,
+                    stderr.trim()
+                );
+                return None;
+            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let last_line = stdout.lines().rev().find(|l| !l.trim().is_empty());
             last_line.map(|s| s.trim().to_string())
         }
         Err(e) => {
