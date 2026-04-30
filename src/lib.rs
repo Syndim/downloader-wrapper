@@ -3,10 +3,11 @@ pub mod config;
 mod ps;
 mod utils;
 
+use std::fs::{self, OpenOptions};
 use std::path::PathBuf;
 
-use anyhow::Result;
-use tracing::{debug, error, warn};
+use anyhow::{Context, Result};
+use tracing::{error, info, warn};
 
 use crate::config::{Config, Downloader};
 
@@ -22,7 +23,7 @@ fn patch_parameters(args: &[String], config: &Config) -> Vec<String> {
 
             // Check if there's a value after -i
             if i + 1 < args.len() {
-                debug!("Processing input file: {}", args[i + 1]);
+                info!("Processing input file: {}", args[i + 1]);
                 i += 1;
                 let input_file = PathBuf::from(&args[i]);
 
@@ -56,14 +57,36 @@ fn patch_parameters(args: &[String], config: &Config) -> Vec<String> {
     modified_args
 }
 
+fn init_logging(config: &Config) -> Result<()> {
+    if let Some(log_path) = &config.log_path {
+        if let Some(parent) = log_path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create log directory: {:?}", parent))?;
+        }
+
+        let log_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+            .with_context(|| format!("Failed to open log file: {:?}", log_path))?;
+
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_ansi(false)
+            .with_writer(log_file)
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .init();
+    }
+
+    Ok(())
+}
+
 pub fn run(downloader: Downloader) -> Result<()> {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .init();
-
-    debug!("Starting {}-wrapper", downloader);
-
     // Get command line arguments (excluding the program name)
     let args: Vec<String> = std::env::args().skip(1).collect();
 
@@ -84,6 +107,10 @@ pub fn run(downloader: Downloader) -> Result<()> {
             Config::default()
         }
     };
+
+    init_logging(&config)?;
+
+    info!("Starting {}-wrapper", downloader);
 
     let modified_args = patch_parameters(&args, &config);
     let status = ps::run_with(&modified_args, config.get_downloader_path(downloader))?;

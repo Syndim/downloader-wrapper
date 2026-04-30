@@ -5,6 +5,9 @@ aria2c_path = "aria2c"
 
 curl_path = "curl"
 
+# Path to the wrapper log file. If omitted, logs are written to stderr.
+log_path = "downloader-wrapper.log"
+
 # URL replacements - patterns are regular expressionsns
 [[replacements]]
 pattern = "^https://example.com/"

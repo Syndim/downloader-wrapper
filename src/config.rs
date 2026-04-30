@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub enum Downloader {
     Aria2c,
@@ -26,6 +26,8 @@ pub struct Config {
     pub aria2c_path: String,
     #[serde(default = "default_curl_path")]
     pub curl_path: String,
+    #[serde(default)]
+    pub log_path: Option<PathBuf>,
 }
 
 /// Default path for aria2c executable
@@ -73,6 +75,7 @@ impl Default for Config {
             replacements: Vec::new(),
             aria2c_path: default_aria2c_path(),
             curl_path: default_curl_path(),
+            log_path: None,
         }
     }
 }

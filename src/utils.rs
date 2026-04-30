@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use duct::cmd;
 use regex::Regex;
-use tracing::{debug, warn};
+use tracing::{info, warn};
 
 use crate::config::Config;
 
@@ -21,14 +21,14 @@ pub fn is_url(s: &str) -> bool {
 fn execute_command_template(template: &str, original_url: &str) -> Option<String> {
     // Substitute {url}
     let rendered = template.replace("{url}", original_url);
-    debug!("Command template: {}", rendered);
+    info!("Command template: {}", rendered);
 
     let mut extra_env: Vec<(String, String)> = Vec::new();
 
     #[cfg(not(target_os = "windows"))]
     {
         let shell = env::var("SHELL").unwrap_or(String::from("bash"));
-        debug!("Using shell: {}", shell);
+        info!("Using shell: {}", shell);
         // We want environment variable expansion via fish, but we only need the environment values,
         // not to run the command. Approach:
         // 1. Capture fish environment into KEY=VALUE lines.
@@ -50,7 +50,7 @@ fn execute_command_template(template: &str, original_url: &str) -> Option<String
                 extra_env.push((k.to_string(), v.to_string()));
             }
         }
-        debug!("Captured {} env vars from fish", extra_env.len());
+        info!("Captured {} env vars from fish", extra_env.len());
     }
 
     // Split original (rendered) command into program/args AFTER variable substitution (fish didn't expand inside rendered).
@@ -63,14 +63,14 @@ fn execute_command_template(template: &str, original_url: &str) -> Option<String
         }
     };
     let (program, args) = parts.split_first().unwrap();
-    debug!(
+    info!(
         "Executing program='{}' args={:?} with fish env",
         program, args
     );
 
     let mut command = cmd(program, args);
     for (k, v) in extra_env {
-        debug!("Adding env: {}={}", k, v);
+        info!("Adding env: {}={}", k, v);
         command = command.env(k, v);
     }
 
@@ -114,7 +114,7 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
                     if rule.replacement.contains("{url}") {
                         if let Some(new_url) = execute_command_template(&rule.replacement, &result)
                         {
-                            debug!(
+                            info!(
                                 "URL replaced via command template: {} -> {}",
                                 result, new_url
                             );
@@ -122,7 +122,7 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
                         }
                     } else {
                         let replaced = regex.replace_all(&result, &rule.replacement).to_string();
-                        debug!("URL replaced via regex: {} -> {}", result, replaced);
+                        info!("URL replaced via regex: {} -> {}", result, replaced);
                         result = replaced;
                     }
                 }
@@ -133,7 +133,7 @@ pub fn apply_url_replacements(config: &Config, url_str: &str) -> String {
         }
     }
 
-    debug!("Final URL: {}", result);
+    info!("Final URL: {}", result);
     result
 }
 

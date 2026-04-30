@@ -43,6 +43,9 @@ Create a `config.toml` file with URL replacement rules:
 aria2c_path = "aria2c"
 curl_path = "curl"
 
+# Path to the wrapper log file. If omitted, logs are written to stderr.
+log_path = "downloader-wrapper.log"
+
 # URL replacements - patterns are regular expressions
 # If `replacement` contains the token `{url}` it is treated as a command
 # template. The command is executed (with `{url}` substituted by the current
