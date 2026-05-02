@@ -8,6 +8,10 @@ curl_path = "curl"
 # Path to the wrapper log file. If omitted, logs are written to stderr.
 log_path = "downloader-wrapper.log"
 
+# Maximum wrapper log file size in bytes. When this size is reached, the current
+# log is rotated to `<log_path>.1` and a new log file is started.
+log_max_size_bytes = 1048576
+
 # URL replacements - patterns are regular expressionsns
 [[replacements]]
 pattern = "^https://example.com/"

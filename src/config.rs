@@ -28,6 +28,8 @@ pub struct Config {
     pub curl_path: String,
     #[serde(default)]
     pub log_path: Option<PathBuf>,
+    #[serde(default = "default_log_max_size_bytes")]
+    pub log_max_size_bytes: u64,
 }
 
 /// Default path for aria2c executable
@@ -38,6 +40,11 @@ fn default_aria2c_path() -> String {
 /// Default path for curl executable
 fn default_curl_path() -> String {
     "curl".to_string()
+}
+
+/// Default maximum log file size in bytes
+pub fn default_log_max_size_bytes() -> u64 {
+    1024 * 1024
 }
 
 /// A single URL replacement rule
@@ -76,6 +83,7 @@ impl Default for Config {
             aria2c_path: default_aria2c_path(),
             curl_path: default_curl_path(),
             log_path: None,
+            log_max_size_bytes: default_log_max_size_bytes(),
         }
     }
 }

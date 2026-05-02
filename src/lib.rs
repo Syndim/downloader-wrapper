@@ -3,11 +3,13 @@ pub mod config;
 mod ps;
 mod utils;
 
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
+use rolling_file::{BasicRollingFileAppender, RollingConditionBasic};
 use tracing::{error, info, warn};
+use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::config::{Config, Downloader};
 
@@ -57,8 +59,13 @@ fn patch_parameters(args: &[String], config: &Config) -> Vec<String> {
     modified_args
 }
 
-fn init_logging(config: &Config) -> Result<()> {
+fn init_logging(config: &Config) -> Result<Option<WorkerGuard>> {
     if let Some(log_path) = &config.log_path {
+        ensure!(
+            config.log_max_size_bytes > 0,
+            "log_max_size_bytes must be greater than 0"
+        );
+
         if let Some(parent) = log_path.parent()
             && !parent.as_os_str().is_empty()
         {
@@ -66,24 +73,26 @@ fn init_logging(config: &Config) -> Result<()> {
                 .with_context(|| format!("Failed to create log directory: {:?}", parent))?;
         }
 
-        let log_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-            .with_context(|| format!("Failed to open log file: {:?}", log_path))?;
+        let log_file = BasicRollingFileAppender::new(
+            log_path,
+            RollingConditionBasic::new().max_size(config.log_max_size_bytes),
+            1,
+        )
+        .with_context(|| format!("Failed to open log file: {:?}", log_path))?;
+        let (non_blocking_log_file, guard) = tracing_appender::non_blocking(log_file);
 
         tracing_subscriber::fmt()
             .with_max_level(tracing::Level::INFO)
             .with_ansi(false)
-            .with_writer(log_file)
+            .with_writer(non_blocking_log_file)
             .init();
+        Ok(Some(guard))
     } else {
         tracing_subscriber::fmt()
             .with_max_level(tracing::Level::INFO)
             .init();
+        Ok(None)
     }
-
-    Ok(())
 }
 
 pub fn run(downloader: Downloader) -> Result<()> {
@@ -108,7 +117,7 @@ pub fn run(downloader: Downloader) -> Result<()> {
         }
     };
 
-    init_logging(&config)?;
+    let _logging_guard = init_logging(&config)?;
 
     info!("Starting {}-wrapper", downloader);
 
